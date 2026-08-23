@@ -1,0 +1,60 @@
+name: Playwright LambdaTest Workflow
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [trigger-playwright-tests]
+  schedule:
+    - cron: '30 5 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  playwright-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      USERNAME_LT: ${{ secrets.USERNAME_LT }}
+      ACCESS_KEY_LT: ${{ secrets.ACCESS_KEY_LT }}
+      LT_GRID_URL: mobile-hub.lambdatest.com
+      MANDRILL_API_KEY: ${{ secrets.MANDRILL_API_KEY }}
+      MAILCHIMP_API_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Playwright test suite on LambdaTest
+        run: npm run test:all
+
+      - name: Generate Allure report
+        if: always()
+        run: npm run allure:generate
+
+      - name: Add CNAME file for custom domain
+        if: always()
+        run: echo "qa-playwright.usahello.org" > ./allure-report/CNAME
+
+      - name: Deploy Allure report to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./allure-report
+          publish_branch: gh-pages
+
+      - name: Upload Allure results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: allure-results
